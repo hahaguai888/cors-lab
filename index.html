@@ -202,10 +202,10 @@ function testFormSubmit() {
 // ============ URL参数自动模式：?autorun=1 无人值守验证 ============
 (function autoBoot() {
   if (!/[?&]autorun=1/.test(location.search)) return;
-  const fr = $("fr");
+  const fr = document.getElementById("fr");
   fr.style.display = "block";
   fr.src = TARGET;
-  const out = $(R6);
+  const out = document.getElementById("r6");
   out.className = "result";
   out.textContent = "[自动模式] ① 加载登录页…";
   const report = { load: false, readDom: false, fill: false, submit: false, readResp: false };
