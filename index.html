@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>SimTrade 跨域方案测试台</title>
+<style>
+  body { font-family: Consolas, "Microsoft YaHei", monospace; background: #1e1e1e; color: #d4d4d4; margin: 0; padding: 20px; }
+  h1 { font-size: 18px; color: #4fc1ff; }
+  h2 { font-size: 15px; color: #9cdcfe; border-bottom: 1px solid #333; padding-bottom: 4px; margin-top: 24px; }
+  .panel { background: #252526; border: 1px solid #333; border-radius: 6px; padding: 12px; margin: 10px 0; }
+  button { background: #0e639c; color: #fff; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin: 4px; font-size: 13px; }
+  button:hover { background: #1177bb; }
+  .result { white-space: pre-wrap; font-size: 12px; background: #1a1a1a; border-radius: 4px; padding: 8px; margin-top: 8px; max-height: 300px; overflow: auto; border-left: 3px solid #666; }
+  .ok { border-left-color: #4ec9b0 !important; }
+  .fail { border-left-color: #f14c4c !important; }
+  .warn { border-left-color: #dcdcaa !important; }
+  .tag { display:inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; margin-left: 8px; }
+  .t-ok { background: #1a3a2a; color: #4ec9b0; }
+  .t-fail { background: #3a1a1a; color: #f14c4c; }
+  .t-warn { background: #3a3a1a; color: #dcdcaa; }
+  input { background: #3c3c3c; border: 1px solid #555; color: #eee; padding: 6px; border-radius: 4px; }
+  iframe { width: 100%; height: 500px; border: 1px solid #555; border-radius: 4px; background: #fff; }
+  table { border-collapse: collapse; width: 100%; font-size: 12px; }
+  td, th { border: 1px solid #444; padding: 6px; text-align: left; }
+  th { background: #2d2d2d; }
+</style>
+</head>
+<body>
+<h1>SimTrade 跨域方案实测台 <span style="font-size:12px;color:#888">目标: http://10.149.50.32:8088/simtrade5/</span></h1>
+<div style="font-size:12px;color:#888">本页面部署于公网 (Cloudflare Pages) —— 模拟"你的服务器"，你的浏览器需在能同时访问公网与内网10.x的环境打开本页</div>
+
+<h2>方案1: iframe 嵌入目标页 (零安装) <span class="tag t-ok" id="tag-frame">待测</span></h2>
+<div class="panel">
+  <button onclick="testFrame()">测试 iframe 加载</button>
+  <button onclick="testFrameAccess()">测试跨iframe读取DOM (关键)</button>
+  <button onclick="testFrameAutoLogin()">测试 iframe 内自动登录 (关键)</button>
+  <div class="result" id="r1">点上方按钮开始…</div>
+  <iframe id="fr" style="display:none"></iframe>
+</div>
+
+<h2>方案2: window.open + document.domain <span class="tag t-warn" id="tag-open">理论不可行</span></h2>
+<div class="panel">
+  <div class="result" id="r2">document.domain 只对同一父域的子域生效（如 a.xx.com 与 b.xx.com），
+公网域名 vs 内网IP 根本无共同父域，跳过实测，直接判死。</div>
+</div>
+
+<h2>方案3: fetch/XHR 跨域请求 (CORS) <span class="tag t-fail" id="tag-cors">待测</span></h2>
+<div class="panel">
+  <button onclick="testFetch()">fetch 目标页 (验证CORS拦截)</button>
+  <div class="result" id="r3">预期被 CORS 拦截 —— 实测留证据</div>
+</div>
+
+<h2>方案4: form 提交 + iframe 接收 (降级表单) <span class="tag t-warn" id="tag-form">待测</span></h2>
+<div class="panel">
+  <button onclick="testFormSubmit()">POST 登录到 iframe (name=iframe)</button>
+  <div class="result" id="r4">form target=iframe 可提交且页面在iframe渲染，但JS读不到iframe内容(跨域) —— 部分可用</div>
+</div>
+
+<h2>方案5: 扩展/油猴 content script (对照组) <span class="tag t-ok" id="tag-ext">基准可行</span></h2>
+<div class="panel">
+  <div class="result" id="r5">content script 与页面同源，无任何限制（v4讨论过的方案，作为对照基准）</div>
+</div>
+
+<h2>汇总</h2>
+<div class="panel">
+<table id="tbl">
+<tr><th>方案</th><th>零安装</th><th>能读页面</th><th>能提交</th><th>能自动登录</th><th>结论</th></tr>
+<tr><td>1 iframe+注入</td><td id="c1a">✓</td><td id="c1b">?</td><td id="c1c">?</td><td id="c1d">?</td><td id="c1e">待测</td></tr>
+<tr><td>2 doc.domain</td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>死路(无共同父域)</td></tr>
+<tr><td>3 fetch CORS</td><td>✓</td><td id="c3b">?</td><td>✗</td><td>✗</td><td id="c3e">待测</td></tr>
+<tr><td>4 form+iframe</td><td>✓</td><td>✗(跨域)</td><td id="c4c">?</td><td>?</td><td id="c4e">待测</td></tr>
+<tr><td>5 扩展</td><td>✗</td><td>✓</td><td>✓</td><td>✓</td><td>基准可行</td></tr>
+</table>
+</div>
+
+<h2>iframe 实操演示区 (若方案1可行)</h2>
+<div class="panel">
+  <p>登录账号: <input id="acc" value="201561244"> 密码: <input id="pwd" type="password" placeholder="留空则只测页面读取">
+  <button onclick="demoLogin()">iframe 自动填表登录</button></p>
+  <div class="result" id="rdemo"></div>
+  <iframe id="frdemo"></iframe>
+</div>
+
+<script>
+const TARGET = "http://10.149.50.32:8088/simtrade5/login.aspx";
+const ORIGIN = "http://10.149.50.32:8088";
+const $ = id => document.getElementById(id);
+
+function log(id, msg, cls) {
+  const el = $(id);
+  el.textContent = "[" + new Date().toLocaleTimeString() + "] " + msg;
+  el.className = "result " + (cls || "");
+}
+
+// ============ 方案1: iframe ============
+function testFrame() {
+  const fr = $("fr");
+  fr.style.display = "block";
+  fr.src = TARGET;
+  let loaded = false;
+  fr.onload = () => { loaded = true; log("r1", "iframe onload 触发 —— 页面已加载渲染（说明无 X-Frame-Options 拦截）", "ok"); };
+  fr.onerror = () => log("r1", "iframe onerror —— 被响应头拒绝", "fail");
+  setTimeout(() => { if (!loaded) log("r1", "3秒无onload——可能被拦截或网络不通", "fail"); }, 3000);
+}
+
+function testFrameAccess() {
+  const fr = $("fr");
+  try {
+    const doc = fr.contentDocument || fr.contentWindow.document;
+    const usr = doc.getElementById("txtUsrName");
+    log("r1", "跨iframe DOM读取成功！拿到输入框: " + usr + " —— iframe方案完全可行！", "ok");
+    $("tag-frame").textContent = "可行";
+    $("tag-frame").className = "tag t-ok";
+    $("c1b").textContent = "✓";
+  } catch (e) {
+    log("r1", "跨iframe DOM读取被拦截: " + e.message, "fail");
+    $("tag-frame").textContent = "仅渲染不可读";
+    $("tag-frame").className = "tag t-fail";
+    $("c1b").textContent = "✗";
+  }
+}
+
+function testFrameAutoLogin() {
+  const fr = $("fr");
+  try {
+    const doc = fr.contentDocument;
+    const usr = doc.getElementById("txtUsrName");
+    const pwd = doc.getElementById("txtUsrPwd");
+    const cls = doc.getElementById("cblUsrCls");
+    if (usr && pwd && cls) {
+      usr.value = $("acc").value || "201561244";
+      pwd.value = $("pwd").value || "(test)";
+      cls.value = "1";
+      log("r1", "iframe内填表成功：usr=" + usr.value + " role=" + cls.value + " —— 可编程操控，自动登录可行！", "ok");
+      $("c1c").textContent = "✓"; $("c1d").textContent = "✓";
+    } else {
+      log("r1", "iframe已加载但找不到表单元素（页面可能未加载完，先点方案1再试）", "warn");
+    }
+  } catch (e) {
+    log("r1", "iframe内操作被拦截: " + e.message, "fail");
+  }
+}
+
+// ============ 方案3: fetch CORS ============
+async function testFetch() {
+  log("r3", "fetch 发起中…");
+  try {
+    const r = await fetch(TARGET, { mode: "cors" });
+    log("r3", "意外成功?! status=" + r.status, "ok"); $("c3b").textContent = "✓"; $("c3e").textContent = "意外可行";
+  } catch (e) {
+    log("r3", "被CORS拦截: " + e.message + " —— 预期内，平台无CORS头，死路确认", "fail");
+    $("tag-cors").textContent = "死路(确认)"; $("c3b").textContent = "✗"; $("c3e").textContent = "死路";
+  }
+  // 顺带测 no-cors 的盲发
+  try {
+    const r2 = await fetch(TARGET, { mode: "no-cors" });
+    log("r3", "no-cors模式: 发送成功但response是opaque(读不到任何内容) status=" + r2.status + " type=" + r2.type, "warn");
+  } catch (e) {
+    log("r3", "no-cors也失败: " + e.message, "fail");
+  }
+}
+
+// ============ 方案4: form+iframe ============
+function testFormSubmit() {
+  const fr = $("fr");
+  fr.style.display = "block";
+  const f = document.createElement("form");
+  f.method = "POST";
+  f.action = TARGET;
+  f.target = "fr";
+  const add = (n, v) => { const i = document.createElement("input"); i.name = n; i.value = v; f.appendChild(i); };
+  add("__EVENTTARGET", "btnLogin"); add("__EVENTARGUMENT", "");
+  add("__VIEWSTATE", "");
+  add("cblUsrCls", "1"); add("txtUsrName", $("acc").value || "201561244"); add("txtUsrPwd", $("pwd").value || "");
+  document.body.appendChild(f);
+  f.submit();
+  f.remove();
+  log("r4", "form已POST到iframe —— 页面应渲染登录结果。但注意：提交能成功，读取响应内容仍受跨域限制", "warn");
+  $("c4c").textContent = "✓";
+  $("c4e").textContent = "半残(能提交不能读)";
+  setTimeout(() => {
+    try {
+      const doc = fr.contentDocument;
+      const body = doc.body ? doc.body.innerHTML.substring(0, 100) : "(无body)";
+      log("r4", "尝试读响应: 成功！内容=" + body, "ok");
+    } catch (e) {
+      log("r4", "读取响应被拦截: " + e.message + " —— 确认form方案只能'盲提交'", "fail");
+    }
+  }, 2500);
+}
+
+// ============ 演示: iframe 自动登录 ============
+function demoLogin() {
+  const fr = $("frdemo");
+  const out = $("rdemo");
+  out.className = "result ok";
+  out.textContent = "步骤1: 加载登录页…";
+  fr.src = TARGET;
+  fr.onload = () => {
+    try {
+      const doc = fr.contentDocument;
+      out.textContent += "\n步骤2: 页面加载完成，读取表单元素…";
+      const usr = doc.getElementById("txtUsrName");
+      const pwd = doc.getElementById("txtUsrPwd");
+      const cls = doc.getElementById("cblUsrCls");
+      if (!usr) { out.textContent += "\n失败: 找不到输入框"; return; }
+      out.textContent += "\n步骤3: 填入账号 " + ($("acc").value || "201561244") + " 角色=1";
+      usr.value = $("acc").value || "201561244";
+      pwd.value = $("pwd").value;
+      cls.value = "1";
+      out.textContent += "\n步骤4: 触发 __doPostBack('btnLogin') 提交…";
+      doc.forms["Form1"].__EVENTTARGET.value = "btnLogin";
+      doc.forms["Form1"].submit();
+      out.textContent += "\n✅ 全流程通过 —— 服务器页面可直接指挥内网浏览器自动化操作平台！";
+    } catch (e) {
+      out.textContent += "\n❌ 失败: " + e.message;
+      out.className = "result fail";
+    }
+  };
+}
+</script>
+</body>
+</html>
