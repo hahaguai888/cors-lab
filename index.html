@@ -29,10 +29,19 @@
 <h1>SimTrade 跨域方案实测台 <span style="font-size:12px;color:#888">目标: http://10.149.50.32:8088/simtrade5/</span></h1>
 <div style="font-size:12px;color:#888">本页面部署于公网 (Cloudflare Pages) —— 模拟"你的服务器"，你的浏览器需在能同时访问公网与内网10.x的环境打开本页</div>
 
+<h2>方案6: 双击bat启动专用浏览器 (--disable-web-security) <span class="tag t-ok" id="tag-bat">零安装·待测</span></h2>
+<div class="panel">
+  <p style="color:#dcdcaa">原理：用启动参数开一个关闭同源策略的专用 Chrome/Edge 窗口（不装任何软件，
+  独立profile不影响用户正常浏览器）。<b>本页若在此窗口中打开，下方自检会自动变绿。</b></p>
+  <button onclick="testFrameAccess()">①自检：跨iframe读DOM（本窗口是否已关闭跨域限制）</button>
+  <button onclick="autoRun()">②全自动五环节测试：加载→读DOM→填表→提交→读响应</button>
+  <div class="result" id="r6">未运行。若你是双击 SimTrade启动器.bat 打开的本页，此方案应全绿。</div>
+</div>
+
 <h2>方案1: iframe 嵌入目标页 (零安装) <span class="tag t-ok" id="tag-frame">待测</span></h2>
 <div class="panel">
   <button onclick="testFrame()">测试 iframe 加载</button>
-  <button onclick="testFrameAccess()">测试跨iframe读取DOM (关键)</button>
+  <button onclick="testFrameAccessOrig()">测试跨iframe读取DOM (关键)</button>
   <button onclick="testFrameAutoLogin()">测试 iframe 内自动登录 (关键)</button>
   <div class="result" id="r1">点上方按钮开始…</div>
   <iframe id="fr" style="display:none"></iframe>
@@ -70,6 +79,7 @@
 <tr><td>3 fetch CORS</td><td>✓</td><td id="c3b">?</td><td>✗</td><td>✗</td><td id="c3e">待测</td></tr>
 <tr><td>4 form+iframe</td><td>✓</td><td>✗(跨域)</td><td id="c4c">?</td><td>?</td><td id="c4e">待测</td></tr>
 <tr><td>5 扩展</td><td>✗</td><td>✓</td><td>✓</td><td>✓</td><td>基准可行</td></tr>
+<tr><td>6 disable-web-security bat</td><td>✓(双击bat)</td><td id="c6b">?</td><td id="c6c">?</td><td id="c6d">?</td><td id="c6e">待测</td></tr>
 </table>
 </div>
 
@@ -103,7 +113,7 @@ function testFrame() {
   setTimeout(() => { if (!loaded) log("r1", "3秒无onload——可能被拦截或网络不通", "fail"); }, 3000);
 }
 
-function testFrameAccess() {
+function testFrameAccessOrig() {
   const fr = $("fr");
   try {
     const doc = fr.contentDocument || fr.contentWindow.document;
@@ -187,6 +197,105 @@ function testFormSubmit() {
       log("r4", "读取响应被拦截: " + e.message + " —— 确认form方案只能'盲提交'", "fail");
     }
   }, 2500);
+}
+
+// ============ 方案6: disable-web-security 自检 + 全自动测试 ============
+const R6 = "r6";
+
+function testFrameAccess() {
+  const fr = $("fr");
+  if (!fr.src) { fr.style.display = "block"; fr.src = TARGET; }
+  let poll = 0;
+  const iv = setInterval(() => {
+    poll++;
+    try {
+      const doc = fr.contentDocument || fr.contentWindow.document;
+      const usr = doc.getElementById("txtUsrName");
+      const isSOPoff = !usr ? false : true;
+      // 能拿到contentDocument且能读元素 = 同源限制已关
+      if (usr) {
+        log(R6, "✅ 自检通过：本窗口同源限制已关闭（可跨iframe读DOM）——方案6生效中！", "ok");
+        log("r1", "跨iframe DOM读取成功！——说明当前运行在 disable-web-security 窗口", "ok");
+        $("tag-frame").textContent = "可行(SOP已关)";
+        $("c1b").textContent = "✓"; $("c6b").textContent = "✓";
+        clearInterval(iv);
+        return;
+      }
+      // doc能拿但页面还没渲染完
+      if (doc && doc.body) {
+        log(R6, "⚠ doc可访问但未找到表单（页面未加载完），继续等待…", "warn");
+      }
+    } catch (e) {
+      log(R6, "❌ 自检失败：同源限制仍在（普通窗口）—— " + e.message, "fail");
+      $("c6b").textContent = "✗";
+      clearInterval(iv);
+      return;
+    }
+    if (poll > 12) {
+      log(R6, "❌ 超时：iframe 未加载。若尚未点方案1的加载，请先点「测试 iframe 加载」", "fail");
+      clearInterval(iv);
+    }
+  }, 500);
+}
+
+function autoRun() {
+  const out = $(R6);
+  out.className = "result ok";
+  out.textContent = "【全自动五环节】 ① 加载登录页…";
+  const fr = $("fr");
+  fr.style.display = "block";
+  fr.src = TARGET;
+
+  const fail = (msg) => { out.textContent += "\n❌ " + msg; out.className = "result fail"; };
+  const done = () => { out.textContent += "\n\n✅ 五环节全通过 —— 方案6完全可行：服务器页面可直接指挥此窗口内自动化操作平台！"; $("c6c").textContent = "✓"; $("c6d").textContent = "✓"; $("c6e").textContent = "可行(推荐)"; $("tag-bat").textContent = "可行·推荐"; };
+
+  fr.onload = () => {
+    let doc;
+    try {
+      doc = fr.contentDocument;
+    } catch (e) {
+      return fail("② 读DOM被拦截: " + e.message + " —— 请用 SimTrade启动器.bat 打开本页");
+    }
+    out.textContent += "\n① 页面加载完成 ✓";
+
+    const usr = doc.getElementById("txtUsrName");
+    const pwd = doc.getElementById("txtUsrPwd");
+    const cls = doc.getElementById("cblUsrCls");
+    if (!usr || !pwd || !cls) return fail("② 找不到表单元素（账号/密码/角色框）");
+    out.textContent += "\n② 跨iframe读DOM成功 ✓ (拿到 txtUsrName/txtUsrPwd/cblUsrCls)";
+
+    try {
+      usr.value = $("acc").value || "201561244";
+      pwd.value = $("pwd").value;
+      cls.value = "1";
+      out.textContent += "\n③ 跨iframe填表成功 ✓ (usr=" + usr.value + " role=" + cls.value + ")";
+    } catch (e) {
+      return fail("③ 填表被拦截: " + e.message);
+    }
+
+    try {
+      doc.forms["Form1"].__EVENTTARGET.value = "btnLogin";
+      doc.forms["Form1"].__EVENTARGUMENT.value = "";
+      doc.forms["Form1"].submit();
+      out.textContent += "\n④ 跨iframe提交表单成功 ✓ (__doPostBack btnLogin 已触发，等待跳转…)";
+    } catch (e) {
+      return fail("④ 提交被拦截: " + e.message);
+    }
+
+    // ⑤ 等2.5s后尝试读响应（跳转后的iframe内容）
+    setTimeout(() => {
+      try {
+        const doc2 = fr.contentDocument;
+        const html = doc2.documentElement.outerHTML;
+        const excerpt = html.replace(/\s+/g, " ").substring(0, 80);
+        out.textContent += "\n⑤ 读取登录响应成功 ✓ 内容片段: " + excerpt;
+        done();
+      } catch (e) {
+        fail("⑤ 读响应被拦截: " + e.message);
+      }
+    }, 2500);
+  };
+  fr.onerror = () => fail("① iframe 加载失败（网络不通或被拦）");
 }
 
 // ============ 演示: iframe 自动登录 ============
