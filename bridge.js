@@ -48,10 +48,23 @@
     out(info); stat("已读取");
   };
   window.__st_bridge = {
-    version: "1.0",
+    version: "1.1",
     toggle: function () {
       panel.style.display = (panel.style.display === "none") ? "block" : "none";
     }
   };
   stat("已就绪");
+  // demo模式：注入后自动填账号+角色，光标停在密码框等用户输入
+  try {
+    var _u = document.getElementById("txtUsrName");
+    var _c = document.getElementById("cblUsrCls");
+    if (_u && _c) {
+      _u.value = "201561244";
+      _c.value = "1";
+      var _p = document.getElementById("txtUsrPwd");
+      if (_p) _p.focus();
+      out("已自动填入账号201561244+出口商，请输入密码后点[登录]");
+      stat("待输密码");
+    }
+  } catch (e) {}
 })();

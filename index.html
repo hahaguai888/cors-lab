@@ -29,6 +29,17 @@
 <h1>SimTrade 跨域方案实测台 <span style="font-size:12px;color:#888">目标: http://10.149.50.32:8088/simtrade5/</span></h1>
 <div style="font-size:12px;color:#888">本页面部署于公网 (Cloudflare Pages) —— 模拟"你的服务器"，你的浏览器需在能同时访问公网与内网10.x的环境打开本页</div>
 
+<h2>⭐ 方案7: 书签助手 Demo（推荐·零安装）<span class="tag t-ok">已验证可用</span></h2>
+<div class="panel" style="border-color:#4fc1ff">
+  <p style="font-size:14px">第一步：把下面这个链接<b>拖到浏览器书签栏</b>（按住左键拖过去）：</p>
+  <p style="font-size:18px;text-align:center;padding:10px;background:#1a1a1a;border-radius:6px">
+    <a href="javascript:(function(){var s=document.createElement('script');s.src='https://hahaguai888.github.io/cors-lab/bridge.js';document.body.appendChild(s);})();" style="color:#4fc1ff;font-weight:bold">👉 SimTrade助手（拖我到书签栏）👈</a>
+  </p>
+  <p style="font-size:14px">第二步：打开 <a href="http://10.149.50.32:8088/simtrade5/login.aspx" target="_blank" style="color:#4fc1ff">平台登录页</a>，点击书签栏上的【SimTrade助手】</p>
+  <p style="font-size:14px">第三步：右上角出现黑色面板（账号已自动填好）→ 输入密码 → 点【登录】</p>
+  <p style="font-size:12px;color:#888">卸载：删除书签即卸载干净。支持 Chrome/Edge/360，Win7 可用（bridge.js 为纯 ES5）。</p>
+</div>
+
 <h2>方案6: 双击bat启动专用浏览器 (--disable-web-security) <span class="tag t-ok" id="tag-bat">零安装·待测</span></h2>
 <div class="panel">
   <p style="color:#dcdcaa">原理：用启动参数开一个关闭同源策略的专用 Chrome/Edge 窗口（不装任何软件，
